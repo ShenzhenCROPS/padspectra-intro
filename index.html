@@ -3,91 +3,227 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PadSpectra — Introduction & Usage</title>
+  <title>PadSpectra — Context-aware Spectral Padding</title>
+  <meta name="description" content="PadSpectra: Transformer + MoE spectral padding for leaf and soil spectra. Manuscript, web app, and API documentation." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <header class="hero">
-    <div class="wrap">
+  <header class="hero" id="top">
+    <div class="hero-grid"></div>
+    <div class="wrap hero-content">
+      <div class="badge">Open-source research project</div>
       <h1>PadSpectra</h1>
-      <p class="subtitle">
-        Transformer-based spectral padding for leaf and soil spectra (350–2500 nm)
+      <p class="tagline">
+        Context-aware spectral padding for leaf and soil spectra using
+        Transformer + Mixture-of-Experts + metadata conditioning.
       </p>
-      <p>
-        This page explains how to use the web app, the input rules, and the API contract.
-      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#workflow">Get Started</a>
+        <a class="btn btn-outline" href="#api">API Reference</a>
+        <a class="btn btn-outline" href="./padspectra_manuscript.pdf" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Paper (PDF)
+        </a>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-num">192,827</span>
+          <span class="stat-label">Training spectra</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">59</span>
+          <span class="stat-label">Sub-datasets</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">~40 dB</span>
+          <span class="stat-label">Average PSNR</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">350–2500</span>
+          <span class="stat-label">Wavelength (nm)</span>
+        </div>
+      </div>
     </div>
   </header>
 
-  <main class="wrap">
-    <section class="card">
-      <h2>What PadSpectra Does</h2>
+  <nav class="topnav" id="navbar">
+    <div class="wrap nav-inner">
+      <a href="#top" class="nav-brand">PadSpectra</a>
+      <div class="nav-links">
+        <a href="#overview">Overview</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#rules">Rules</a>
+        <a href="#playground">Playground</a>
+        <a href="#api">API</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="wrap main">
+
+    <!-- Overview -->
+    <section class="card reveal" id="overview">
+      <h2>Why PadSpectra?</h2>
       <p>
-        PadSpectra reconstructs missing wavelength regions from incomplete spectra by combining
-        spectral values with auxiliary metadata (sample type, spectral type, spectrometer, and
-        geometric configuration). It is designed for heterogeneous datasets and low/partial-range
-        spectrometers.
+        Real spectral libraries are incomplete and heterogeneous due to instrument limits
+        and preprocessing choices. PadSpectra reconstructs missing spectral regions while
+        conditioning on measurement context: sample type, spectral type, spectrometer,
+        and geometric configuration.
       </p>
+
+      <figure class="fig-wide lightbox-img">
+        <img src="./images/extracted/p07_x14_27c63e06.png" alt="PadSpectra model architecture: Transformer + Cross-Attention + MoE pipeline" loading="lazy" />
+        <figcaption>Model architecture — Transformer layers with cross-attention and Mixture-of-Experts gating.</figcaption>
+      </figure>
+
+      <div class="grid-2">
+        <div>
+          <h3>Core Findings</h3>
+          <ul>
+            <li>Reconstruction is context-dependent — metadata is required for stable optimization on large multi-source data.</li>
+            <li>Wavelengths near 950–1000 nm and longer ranges are highly informative for missing-band inference.</li>
+            <li>Pruning MoE experts reduces parameters by ~24% with minor accuracy change.</li>
+          </ul>
+          <figure class="fig-inline lightbox-img">
+            <img src="./images/extracted/p12_x30_94c5abad.png" alt="Reconstruction examples: measured vs predicted spectra under various input band configurations" loading="lazy" />
+            <figcaption>Example output — measured (black) vs padded (red) for different keep-range configurations. Pink regions are reconstructed.</figcaption>
+          </figure>
+        </div>
+        <div>
+          <h3>Data Composition</h3>
+          <ul>
+            <li>Leaf reflectance: 43,054 spectra</li>
+            <li>Leaf transmittance: 8,312 spectra</li>
+            <li>Soil reflectance: 141,461 spectra</li>
+            <li>Coverage: 350–2500 nm at 1 nm interval</li>
+          </ul>
+          <figure class="fig-inline fig-inline--tall lightbox-img">
+            <img src="./images/extracted/p17_x46_bc64d4c1.png" alt="PSNR heatmap across 200 random band-combination selections" loading="lazy" />
+            <figcaption>Reconstruction PSNR across random band selections — green = higher accuracy, red = narrower input.</figcaption>
+          </figure>
+        </div>
+      </div>
     </section>
 
-    <section class="card">
+    <!-- Workflow -->
+    <section class="card reveal" id="workflow">
       <h2>Web App Workflow</h2>
-      <ol>
-        <li>Upload a Spectra CSV (required).</li>
-        <li>Upload a Property CSV (optional if property override is fully selected).</li>
-        <li>Select spectra indices to visualize.</li>
-        <li>Set keep wavelength ranges (optional mask).</li>
-        <li>Run <code>PadSpectra Padding</code> for all rows.</li>
-        <li>Download padded spectra CSV.</li>
-      </ol>
+      <p>Six steps to pad your spectra using the web interface.</p>
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">1</span>
+          <div>
+            <strong>Upload Spectra CSV</strong>
+            <span class="muted"> — required input file with wavelength columns.</span>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">2</span>
+          <div>
+            <strong>Upload Property CSV</strong>
+            <span class="muted"> — or fully specify Property Override.</span>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">3</span>
+          <div>
+            <strong>Select spectra indices</strong>
+            <span class="muted"> — choose rows to visualize.</span>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">4</span>
+          <div>
+            <strong>Define keep ranges</strong>
+            <span class="muted"> — optionally restrict wavelength bands.</span>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">5</span>
+          <div>
+            <strong>Run padding</strong>
+            <span class="muted"> — process all rows through the model.</span>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">6</span>
+          <div>
+            <strong>Download results</strong>
+            <span class="muted"> — overlay padded traces and export CSV.</span>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="card">
-      <h2>Data Upload Rules</h2>
-      <h3>Spectra CSV</h3>
-      <ul>
-        <li>Header must contain numeric wavelength columns.</li>
-        <li>Each row is one spectrum.</li>
-        <li>Values should be numeric; empty/NaN values are allowed.</li>
-        <li>Extra non-wavelength columns may be ignored for model input.</li>
-        <li>Model input expects 2150 values (43 × 50); if 2151, last value is dropped for inference.</li>
-        <li>Masked regions are represented by value <code>0</code> for model input.</li>
-      </ul>
-
-      <h3>Property CSV</h3>
-      <ul>
-        <li>Each row corresponds to a spectrum (row-order alignment by default).</li>
-        <li>Required columns:
-          <code>sample</code>,
-          <code>spectral type</code>,
-          <code>spectrometer</code>,
-          <code>geometric configuration</code>.
-        </li>
-        <li>Values should be strings.</li>
-        <li>Property CSV is optional when user-specified property override is fully active.</li>
-      </ul>
-    </section>
-
-    <section class="card">
-      <h2>Keep Wavelength Ranges Rules</h2>
+    <!-- Rules -->
+    <section class="card reveal" id="rules">
+      <h2>Input Rules</h2>
+      <div class="grid-2">
+        <div>
+          <h3>Spectra Upload</h3>
+          <ul>
+            <li>Header must include numeric wavelength columns.</li>
+            <li>Each row is one spectrum.</li>
+            <li>Values should be floats; empty/NaN accepted.</li>
+            <li>Non-wavelength columns are ignored for model input.</li>
+            <li>Inference expects 2150 values (43 &times; 50). If 2151, the last value is dropped.</li>
+            <li>Masked model-input regions use value <code>0</code>.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Property Upload</h3>
+          <ul>
+            <li>Row-order alignment by default.</li>
+            <li>Required columns:
+              <code>sample</code>,
+              <code>spectral type</code>,
+              <code>spectrometer</code>,
+              <code>geometric configuration</code>.
+            </li>
+            <li>Values are string fields.</li>
+            <li>Property CSV is optional only when override selections are complete.</li>
+          </ul>
+        </div>
+      </div>
+      <h3>Keep Wavelength Ranges</h3>
       <ul>
         <li>Accepts 1 or 2 ranges, e.g. <code>350-2000</code> or <code>400-900,1100-2300</code>.</li>
         <li>Endpoints must be within <code>350–2500</code>.</li>
-        <li>All endpoints must be divisible by 50.</li>
+        <li>Endpoints must be divisible by 50.</li>
         <li>Total kept span must be at least 500 nm.</li>
-        <li>Three or more ranges are not allowed.</li>
-        <li>Ranges must not overlap.</li>
-        <li>If two ranges are used, the gap between them must be ≤ 400 nm.</li>
+        <li>Maximum 2 ranges; they must not overlap.</li>
+        <li>For 2 ranges, the inter-range gap must be at most 400 nm.</li>
       </ul>
     </section>
 
-    <section class="card">
-      <h2>API</h2>
-      <p><strong>Endpoint:</strong> <code>POST /api/padspectra/predict_all</code></p>
-      <p><strong>Purpose:</strong> run padding for all spectra rows in one call.</p>
+    <!-- Playground -->
+    <section class="card reveal" id="playground">
+      <h2>Mask Rule Playground</h2>
+      <p>Try a keep-range input and check whether it passes validation.</p>
+      <div class="play-row">
+        <input id="maskInput" type="text" placeholder="e.g. 400-900,1100-2300" />
+        <button id="checkMask" class="btn btn-primary" type="button">Validate</button>
+      </div>
+      <div id="maskResult" class="play-result neutral">Enter a range above and click Validate.</div>
+    </section>
 
-      <h3>Request Schema</h3>
-      <pre><code>{
+    <!-- API -->
+    <section class="card reveal" id="api">
+      <h2>API Reference</h2>
+      <div class="endpoint-badge">POST <code>/api/padspectra/predict_all</code></div>
+      <p>Runs spectral padding for all rows in batch mode.</p>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="req" role="tab">Request Body</button>
+        <button class="tab" data-tab="resp" role="tab">Response</button>
+        <button class="tab" data-tab="python" role="tab">Python Example</button>
+      </div>
+
+      <div class="tab-panel active" id="req">
+<pre><code>{
   "wavelengths": [ ... 2150 numbers ... ],
   "spectra_model": [
     [ ... 2150 numbers ... ],
@@ -109,46 +245,49 @@
     "pad_index": 35
   }
 }</code></pre>
+      </div>
 
-      <h3>Response Schema</h3>
-      <pre><code>{
+      <div class="tab-panel" id="resp">
+<pre><code>{
   "padded": [
     [ ... 2150 numbers ... ],
     [ ... 2150 numbers ... ]
   ]
 }</code></pre>
+      </div>
 
-      <h3>curl Example</h3>
-      <pre><code>curl -X POST http://localhost:3000/api/padspectra/predict_all \
-  -H "Content-Type: application/json" \
-  -d @payload.json</code></pre>
+      <div class="tab-panel" id="python">
+<pre><code>import requests
 
-      <h3>Python Example</h3>
-      <pre><code>import requests
-
-resp = requests.post(
-    "http://localhost:3000/api/padspectra/predict_all",
-    json=payload,
-    timeout=120
-)
+url = "http://localhost:3000/api/padspectra/predict_all"
+resp = requests.post(url, json=payload, timeout=120)
 resp.raise_for_status()
-print(resp.json().keys())</code></pre>
+data = resp.json()
+print("rows:", len(data["padded"]))</code></pre>
+      </div>
+
+      <h3>Common Error Causes (400)</h3>
+      <ul>
+        <li>Spectra row length is not 2150 (or not normalized from 2151).</li>
+        <li>Properties count does not match spectra row count.</li>
+        <li>Required property keys are missing.</li>
+      </ul>
     </section>
 
-    <section class="card">
-      <h2>Deployment Note</h2>
-      <p>
-        If using Docker Compose, run:
-        <code>docker compose up -d --build</code>
-      </p>
-      <p>
-        Web is exposed on port 3000. Inference service stays internal and is called by the web app.
-      </p>
-    </section>
   </main>
 
-  <footer class="wrap footer">
-    <p>PadSpectra documentation page (static). Generated from project behavior and manuscript summary.</p>
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <p>PadSpectra &mdash; context-aware spectral padding for remote sensing research.</p>
+      <a href="#top">Back to top &uarr;</a>
+    </div>
   </footer>
+
+  <dialog id="lightbox">
+    <img id="lightboxImg" alt="Figure preview" />
+    <button id="closeLightbox" type="button">&times; Close</button>
+  </dialog>
+
+  <script src="./script.js"></script>
 </body>
 </html>
