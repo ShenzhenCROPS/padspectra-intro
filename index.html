@@ -1,1 +1,154 @@
-Hello World
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PadSpectra — Introduction & Usage</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <h1>PadSpectra</h1>
+      <p class="subtitle">
+        Transformer-based spectral padding for leaf and soil spectra (350–2500 nm)
+      </p>
+      <p>
+        This page explains how to use the web app, the input rules, and the API contract.
+      </p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>What PadSpectra Does</h2>
+      <p>
+        PadSpectra reconstructs missing wavelength regions from incomplete spectra by combining
+        spectral values with auxiliary metadata (sample type, spectral type, spectrometer, and
+        geometric configuration). It is designed for heterogeneous datasets and low/partial-range
+        spectrometers.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Web App Workflow</h2>
+      <ol>
+        <li>Upload a Spectra CSV (required).</li>
+        <li>Upload a Property CSV (optional if property override is fully selected).</li>
+        <li>Select spectra indices to visualize.</li>
+        <li>Set keep wavelength ranges (optional mask).</li>
+        <li>Run <code>PadSpectra Padding</code> for all rows.</li>
+        <li>Download padded spectra CSV.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Data Upload Rules</h2>
+      <h3>Spectra CSV</h3>
+      <ul>
+        <li>Header must contain numeric wavelength columns.</li>
+        <li>Each row is one spectrum.</li>
+        <li>Values should be numeric; empty/NaN values are allowed.</li>
+        <li>Extra non-wavelength columns may be ignored for model input.</li>
+        <li>Model input expects 2150 values (43 × 50); if 2151, last value is dropped for inference.</li>
+        <li>Masked regions are represented by value <code>0</code> for model input.</li>
+      </ul>
+
+      <h3>Property CSV</h3>
+      <ul>
+        <li>Each row corresponds to a spectrum (row-order alignment by default).</li>
+        <li>Required columns:
+          <code>sample</code>,
+          <code>spectral type</code>,
+          <code>spectrometer</code>,
+          <code>geometric configuration</code>.
+        </li>
+        <li>Values should be strings.</li>
+        <li>Property CSV is optional when user-specified property override is fully active.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Keep Wavelength Ranges Rules</h2>
+      <ul>
+        <li>Accepts 1 or 2 ranges, e.g. <code>350-2000</code> or <code>400-900,1100-2300</code>.</li>
+        <li>Endpoints must be within <code>350–2500</code>.</li>
+        <li>All endpoints must be divisible by 50.</li>
+        <li>Total kept span must be at least 500 nm.</li>
+        <li>Three or more ranges are not allowed.</li>
+        <li>Ranges must not overlap.</li>
+        <li>If two ranges are used, the gap between them must be ≤ 400 nm.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>API</h2>
+      <p><strong>Endpoint:</strong> <code>POST /api/padspectra/predict_all</code></p>
+      <p><strong>Purpose:</strong> run padding for all spectra rows in one call.</p>
+
+      <h3>Request Schema</h3>
+      <pre><code>{
+  "wavelengths": [ ... 2150 numbers ... ],
+  "spectra_model": [
+    [ ... 2150 numbers ... ],
+    [ ... 2150 numbers ... ]
+  ],
+  "properties": [
+    {
+      "sample": "leaf",
+      "spectral type": "reflectance",
+      "spectrometer": "asd",
+      "geometric configuration": "directional - directional"
+    }
+  ],
+  "config": {
+    "bandnum": 43,
+    "bandwidth": 50,
+    "maxsentences": 4,
+    "maxwords": 6,
+    "pad_index": 35
+  }
+}</code></pre>
+
+      <h3>Response Schema</h3>
+      <pre><code>{
+  "padded": [
+    [ ... 2150 numbers ... ],
+    [ ... 2150 numbers ... ]
+  ]
+}</code></pre>
+
+      <h3>curl Example</h3>
+      <pre><code>curl -X POST http://localhost:3000/api/padspectra/predict_all \
+  -H "Content-Type: application/json" \
+  -d @payload.json</code></pre>
+
+      <h3>Python Example</h3>
+      <pre><code>import requests
+
+resp = requests.post(
+    "http://localhost:3000/api/padspectra/predict_all",
+    json=payload,
+    timeout=120
+)
+resp.raise_for_status()
+print(resp.json().keys())</code></pre>
+    </section>
+
+    <section class="card">
+      <h2>Deployment Note</h2>
+      <p>
+        If using Docker Compose, run:
+        <code>docker compose up -d --build</code>
+      </p>
+      <p>
+        Web is exposed on port 3000. Inference service stays internal and is called by the web app.
+      </p>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p>PadSpectra documentation page (static). Generated from project behavior and manuscript summary.</p>
+  </footer>
+</body>
+</html>
